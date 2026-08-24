@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -21,26 +20,42 @@ import androidx.core.app.NotificationCompat
 class ScreenCaptureService : Service() {
 
     companion object {
-        const val ACTION_START = "START_CAPTURE"
-        const val ACTION_STOP = "STOP_CAPTURE"
+        const val ACTION_START =
+            "com.aimbuddy.START"
 
-        const val EXTRA_RESULT_CODE = "result_code"
-        const val EXTRA_RESULT_DATA = "result_data"
+        const val ACTION_STOP =
+            "com.aimbuddy.STOP"
 
-        private const val CHANNEL_ID = "capture_channel"
-        private const val NOTIFICATION_ID = 1001
+        const val EXTRA_RESULT_CODE =
+            "result_code"
 
-        private const val DELAY_MS = 3000L
+        const val EXTRA_RESULT_DATA =
+            "result_data"
+
+        private const val CHANNEL_ID =
+            "cucak_capture"
+
+        private const val NOTIFICATION_ID =
+            1001
+
+        private const val START_DELAY =
+            3000L
     }
 
     private val handler =
         Handler(Looper.getMainLooper())
 
-    private var mediaProjection: MediaProjection? = null
-    private var virtualDisplay: VirtualDisplay? = null
-    private var imageReader: ImageReader? = null
+    private var projection:
+        MediaProjection? = null
 
-    private var frameCount = 0L
+    private var virtualDisplay:
+        VirtualDisplay? = null
+
+    private var imageReader:
+        ImageReader? = null
+
+    private var captureStarted =
+        false
 
     override fun onCreate() {
         super.onCreate()
@@ -69,7 +84,7 @@ class ScreenCaptureService : Service() {
                         -1
                     )
 
-                val resultData =
+                val resultData: Intent? =
                     if (Build.VERSION.SDK_INT >= 33) {
                         intent.getParcelableExtra(
                             EXTRA_RESULT_DATA,
@@ -86,10 +101,26 @@ class ScreenCaptureService : Service() {
                     resultCode != -1 &&
                     resultData != null
                 ) {
-                    startCaptureWithDelay(
-                        resultCode,
-                        resultData
+
+                    handler.removeCallbacksAndMessages(
+                        null
                     )
+
+                    /*
+                     * Sau khi người dùng cấp quyền,
+                     * đợi đúng 3 giây rồi mới tạo
+                     * MediaProjection.
+                     */
+                    handler.postDelayed({
+
+                        if (!isDestroyed) {
+                            startCapture(
+                                resultCode,
+                                resultData
+                            )
+                        }
+
+                    }, START_DELAY)
                 }
             }
 
@@ -102,52 +133,32 @@ class ScreenCaptureService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startCaptureWithDelay(
-        resultCode: Int,
-        resultData: Intent
-    ) {
-
-        stopCapture()
-
-        /*
-         * Quyền đã được cấp.
-         * Chờ đúng 3 giây trước khi tạo
-         * VirtualDisplay/ImageReader.
-         */
-        handler.postDelayed({
-
-            if (isDestroyed()) {
-                return@postDelayed
-            }
-
-            startCapture(
-                resultCode,
-                resultData
-            )
-
-        }, DELAY_MS)
-    }
+    private var isDestroyed = false
 
     private fun startCapture(
         resultCode: Int,
         resultData: Intent
     ) {
 
+        stopCapture()
+
         val manager =
             getSystemService(
                 MEDIA_PROJECTION_SERVICE
             ) as MediaProjectionManager
 
-        mediaProjection =
+        val newProjection =
             manager.getMediaProjection(
                 resultCode,
                 resultData
             )
 
-        if (mediaProjection == null) {
+        if (newProjection == null) {
             stopSelf()
             return
         }
+
+        projection = newProjection
 
         val metrics =
             resources.displayMetrics
@@ -161,7 +172,11 @@ class ScreenCaptureService : Service() {
         val density =
             metrics.densityDpi
 
-        imageReader =
+        /*
+         * ImageReader chỉ giữ tối đa 2 frame.
+         * Không tạo file ảnh/video.
+         */
+        val newReader =
             ImageReader.newInstance(
                 width,
                 height,
@@ -169,9 +184,15 @@ class ScreenCaptureService : Service() {
                 2
             )
 
-        imageReader?.setOnImageAvailableListener(
+        imageReader = newReader
+
+        newReader.setOnImageAvailableListener(
             { reader ->
 
+                /*
+                 * acquireLatestImage() bỏ qua các
+                 * frame cũ và lấy frame mới nhất.
+                 */
                 val image =
                     reader.acquireLatestImage()
                         ?: return@setOnImageAvailableListener
@@ -179,40 +200,42 @@ class ScreenCaptureService : Service() {
                 try {
 
                     /*
-                     * Chỉ kiểm tra pipeline.
-                     * Không lưu frame.
+                     * FRAME ĐƯỢC NHẬN TẠI ĐÂY.
+                     *
+                     * Nghiên cứu xử lý ảnh có thể được
+                     * đặt ở đây.
+                     *
+                     * Không lưu frame xuống bộ nhớ.
                      */
-                    frameCount++
 
                 } finally {
 
-                    /*
-                     * BẮT BUỘC đóng image
-                     * để tránh đầy ImageReader.
-                     */
                     image.close()
                 }
-
             },
             handler
         )
 
         virtualDisplay =
-            mediaProjection?.createVirtualDisplay(
+            newProjection.createVirtualDisplay(
                 "CucakCapture",
                 width,
                 height,
                 density,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader?.surface,
+                newReader.surface,
                 null,
                 handler
             )
+
+        captureStarted = true
     }
 
     private fun stopCapture() {
 
-        handler.removeCallbacksAndMessages(null)
+        handler.removeCallbacksAndMessages(
+            null
+        )
 
         virtualDisplay?.release()
         virtualDisplay = null
@@ -225,10 +248,10 @@ class ScreenCaptureService : Service() {
         imageReader?.close()
         imageReader = null
 
-        mediaProjection?.stop()
-        mediaProjection = null
+        projection?.stop()
+        projection = null
 
-        frameCount = 0L
+        captureStarted = false
     }
 
     private fun createNotificationChannel() {
@@ -241,9 +264,12 @@ class ScreenCaptureService : Service() {
             val channel =
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Screen Capture",
+                    "Cucak Screen Capture",
                     NotificationManager.IMPORTANCE_LOW
                 )
+
+            channel.description =
+                "Screen capture service"
 
             val manager =
                 getSystemService(
@@ -256,27 +282,34 @@ class ScreenCaptureService : Service() {
         }
     }
 
-    private fun createNotification(): Notification {
+    private fun createNotification():
+        Notification {
 
-        return NotificationCompat
-            .Builder(
-                this,
-                CHANNEL_ID
-            )
-            .setContentTitle(
-                "Cucak"
-            )
+        return NotificationCompat.Builder(
+            this,
+            CHANNEL_ID
+        )
+            .setContentTitle("Cucak")
             .setContentText(
-                "Screen capture is running"
+                if (captureStarted) {
+                    "Screen capture is running"
+                } else {
+                    "Preparing screen capture..."
+                }
             )
             .setSmallIcon(
                 android.R.drawable.ic_menu_camera
             )
             .setOngoing(true)
+            .setCategory(
+                NotificationCompat.CATEGORY_SERVICE
+            )
             .build()
     }
 
     override fun onDestroy() {
+
+        isDestroyed = true
 
         stopCapture()
 
