@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.aimbuddy"
+    namespace = "com.example.poseresearch"
     compileSdk = 36
 
     defaultConfig {
