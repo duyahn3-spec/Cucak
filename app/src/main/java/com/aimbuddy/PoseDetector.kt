@@ -1,124 +1,254 @@
-package com.aimbuddy
+package com.example.poseresearch
 
 import android.content.Context
 import android.graphics.Bitmap
-import com.google.ai.edge.litert.Accelerator
-import com.google.ai.edge.litert.CompiledModel
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.pose.PoseLandmark
+import com.google.mlkit.vision.pose.Pose
+import com.google.mlkit.vision.pose.PoseDetection
+import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class PoseDetector(
     context: Context
 ) {
 
-    companion object {
-        private const val INPUT_SIZE = 256
-    }
-
-    private val model: CompiledModel =
-        CompiledModel.create(
-            context.assets,
-            "models/pose_256_fp16.tflite",
-            CompiledModel.Options(
-                Accelerator.GPU
-            ),
-            null
+    private val detector =
+        PoseDetection.getClient(
+            PoseDetectorOptions.Builder()
+                .setDetectorMode(
+                    PoseDetectorOptions.STREAM_MODE
+                )
+                .build()
         )
-
-    private val inputs =
-        model.createInputBuffers()
-
-    private val outputs =
-        model.createOutputBuffers()
 
     fun detect(
-        source: Bitmap
-    ): PoseResult {
+        bitmap: Bitmap,
+        width: Int,
+        height: Int
+    ): PoseResult? {
 
         val start =
-            System.nanoTime()
-
-        val bitmap =
-            Bitmap.createScaledBitmap(
-                source,
-                INPUT_SIZE,
-                INPUT_SIZE,
-                true
-            )
-
-        val pixels =
-            IntArray(
-                INPUT_SIZE * INPUT_SIZE
-            )
-
-        bitmap.getPixels(
-            pixels,
-            0,
-            INPUT_SIZE,
-            0,
-            0,
-            INPUT_SIZE,
-            INPUT_SIZE
-        )
+            System.currentTimeMillis()
 
         val input =
-            FloatArray(
-                INPUT_SIZE *
-                    INPUT_SIZE *
-                    3
+            InputImage.fromBitmap(
+                bitmap,
+                0
             )
 
-        var index = 0
+        var resultPose: Pose? = null
 
-        for (pixel in pixels) {
+        val latch =
+            CountDownLatch(1)
 
-            val r =
-                (pixel shr 16) and 0xFF
+        detector.process(input)
+            .addOnSuccessListener {
+                resultPose = it
+                latch.countDown()
+            }
+            .addOnFailureListener {
+                latch.countDown()
+            }
 
-            val g =
-                (pixel shr 8) and 0xFF
+        latch.await(
+            150L,
+            TimeUnit.MILLISECONDS
+        )
 
-            val b =
-                pixel and 0xFF
+        val pose =
+            resultPose
+                ?: return null
 
-            input[index++] =
-                (r - 128f) / 256f
+        val landmarks =
+            pose.allPoseLandmarks
 
-            input[index++] =
-                (g - 128f) / 256f
-
-            input[index++] =
-                (b - 128f) / 256f
+        if (landmarks.isEmpty()) {
+            return null
         }
 
-        inputs[0].writeFloat(input)
+        var minX =
+            Float.MAX_VALUE
 
-        model.run(
-            inputs,
-            outputs
-        )
+        var minY =
+            Float.MAX_VALUE
 
-        val output =
-            outputs[0].readFloat()
+        var maxX =
+            Float.MIN_VALUE
 
-        val decoded =
-            PoseDecoder.decode(output)
+        var maxY =
+            Float.MIN_VALUE
 
-        val elapsed =
-            (
-                System.nanoTime() -
+        val keypoints =
+            ArrayList<PoseKeypoint>()
+
+        for (landmark in landmarks) {
+
+            val x =
+                landmark.position.x
+
+            val y =
+                landmark.position.y
+
+            minX =
+                minOf(
+                    minX,
+                    x
+                )
+
+            minY =
+                minOf(
+                    minY,
+                    y
+                )
+
+            maxX =
+                maxOf(
+                    maxX,
+                    x
+                )
+
+            maxY =
+                maxOf(
+                    maxY,
+                    y
+                )
+
+            keypoints.add(
+                PoseKeypoint(
+                    name =
+                        landmarkName(
+                            landmark.landmarkType
+                        ),
+                    x = x,
+                    y = y,
+                    confidence =
+                        landmark.inFrameLikelihood
+                )
+            )
+        }
+
+        val centerX =
+            (minX + maxX) / 2f
+
+        val centerY =
+            (minY + maxY) / 2f
+
+        return PoseResult(
+            timestampMs =
+                System.currentTimeMillis(),
+            frameWidth =
+                width,
+            frameHeight =
+                height,
+            centerX =
+                centerX,
+            centerY =
+                centerY,
+            left =
+                minX,
+            top =
+                minY,
+            right =
+                maxX,
+            bottom =
+                maxY,
+            keypoints =
+                keypoints,
+            latencyMs =
+                System.currentTimeMillis() -
                     start
-                ) / 1_000_000.0
-
-        return decoded.copy(
-            inferenceMs = elapsed
         )
+    }
+
+    private fun landmarkName(
+        type: Int
+    ): String {
+
+        return when (type) {
+
+            PoseLandmark.NOSE ->
+                "nose"
+
+            PoseLandmark.LEFT_EYE_INNER ->
+                "left_eye_inner"
+
+            PoseLandmark.LEFT_EYE ->
+                "left_eye"
+
+            PoseLandmark.LEFT_EYE_OUTER ->
+                "left_eye_outer"
+
+            PoseLandmark.RIGHT_EYE_INNER ->
+                "right_eye_inner"
+
+            PoseLandmark.RIGHT_EYE ->
+                "right_eye"
+
+            PoseLandmark.RIGHT_EYE_OUTER ->
+                "right_eye_outer"
+
+            PoseLandmark.LEFT_EAR ->
+                "left_ear"
+
+            PoseLandmark.RIGHT_EAR ->
+                "right_ear"
+
+            PoseLandmark.LEFT_SHOULDER ->
+                "left_shoulder"
+
+            PoseLandmark.RIGHT_SHOULDER ->
+                "right_shoulder"
+
+            PoseLandmark.LEFT_ELBOW ->
+                "left_elbow"
+
+            PoseLandmark.RIGHT_ELBOW ->
+                "right_elbow"
+
+            PoseLandmark.LEFT_WRIST ->
+                "left_wrist"
+
+            PoseLandmark.RIGHT_WRIST ->
+                "right_wrist"
+
+            PoseLandmark.LEFT_HIP ->
+                "left_hip"
+
+            PoseLandmark.RIGHT_HIP ->
+                "right_hip"
+
+            PoseLandmark.LEFT_KNEE ->
+                "left_knee"
+
+            PoseLandmark.RIGHT_KNEE ->
+                "right_knee"
+
+            PoseLandmark.LEFT_ANKLE ->
+                "left_ankle"
+
+            PoseLandmark.RIGHT_ANKLE ->
+                "right_ankle"
+
+            PoseLandmark.LEFT_HEEL ->
+                "left_heel"
+
+            PoseLandmark.RIGHT_HEEL ->
+                "right_heel"
+
+            PoseLandmark.LEFT_FOOT_INDEX ->
+                "left_foot"
+
+            PoseLandmark.RIGHT_FOOT_INDEX ->
+                "right_foot"
+
+            else ->
+                "unknown"
+        }
     }
 
     fun close() {
-        /*
-         * Không gọi model.destroy().
-         *
-         * LiteRT version hiện tại của project
-         * không cho phép gọi destroy() ở đây.
-         */
+        detector.close()
     }
 }
