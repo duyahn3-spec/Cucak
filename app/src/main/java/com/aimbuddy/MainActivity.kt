@@ -16,8 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class MainActivity :
-    AppCompatActivity() {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var imageView: ImageView
     private lateinit var overlay: PoseOverlayView
@@ -37,9 +36,7 @@ class MainActivity :
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
-        super.onCreate(
-            savedInstanceState
-        )
+        super.onCreate(savedInstanceState)
 
         setContentView(
             R.layout.activity_main
@@ -118,9 +115,9 @@ class MainActivity :
 
                     status.text =
                         "18 keypoints | " +
-                        "%.1f ms".format(
-                            elapsed
-                        )
+                            "%.1f ms".format(
+                                elapsed
+                            )
                 }
 
             } catch (e: Exception) {
@@ -161,11 +158,10 @@ class MainActivity :
 
                 @Suppress("DEPRECATION")
 
-                MediaStore.Images.Media
-                    .getBitmap(
-                        contentResolver,
-                        uri
-                    )
+                MediaStore.Images.Media.getBitmap(
+                    contentResolver,
+                    uri
+                )
             }
 
         } catch (
@@ -182,4 +178,4 @@ class MainActivity :
 
         super.onDestroy()
     }
-    }
+}
