@@ -22,11 +22,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build APK
-        working-directory: PoseResearch
-        run: gradle assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PoseResearch-debug
-          path: PoseResearch/app/build/outputs/apk/debug/app-debug.apk
+          name: Cucak-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
