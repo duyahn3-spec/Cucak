@@ -1,180 +1,95 @@
-package com.example.poseresearch
+package com.aimbuddy
 
-import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.net.Uri
-import android.os.Build
+import android.content.Intent
+import android.media.projection.MediaProjectionManager
 import android.os.Bundle
-import android.provider.MediaStore
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var imageView: ImageView
-    private lateinit var overlay: PoseOverlayView
-    private lateinit var status: TextView
-    private lateinit var detector: PoseDetector
+    private lateinit var projectionManager:
+        MediaProjectionManager
 
-    private val imagePicker =
+    private val projectionLauncher =
         registerForActivityResult(
-            ActivityResultContracts.GetContent()
-        ) { uri ->
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
 
-            if (uri != null) {
-                loadAndRun(uri)
+            if (
+                result.resultCode != RESULT_OK ||
+                result.data == null
+            ) {
+                return@registerForActivityResult
             }
+
+            val serviceIntent =
+                Intent(
+                    this,
+                    ScreenCaptureService::class.java
+                ).apply {
+
+                    action =
+                        ScreenCaptureService.ACTION_START
+
+                    putExtra(
+                        ScreenCaptureService.EXTRA_RESULT_CODE,
+                        result.resultCode
+                    )
+
+                    putExtra(
+                        ScreenCaptureService.EXTRA_RESULT_DATA,
+                        result.data
+                    )
+                }
+
+            startForegroundService(
+                serviceIntent
+            )
         }
 
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
-        super.onCreate(savedInstanceState)
+
+        super.onCreate(
+            savedInstanceState
+        )
 
         setContentView(
             R.layout.activity_main
         )
 
-        imageView =
-            findViewById(R.id.imageView)
+        projectionManager =
+            getSystemService(
+                MEDIA_PROJECTION_SERVICE
+            ) as MediaProjectionManager
 
-        overlay =
-            findViewById(R.id.poseOverlay)
+        /*
+         * Nếu layout hiện tại của bạn có Button
+         * id = selectButton thì có thể dùng nó
+         * để gọi requestCapture().
+         */
 
-        status =
-            findViewById(R.id.status)
-
-        detector =
-            PoseDetector(this)
-
-        findViewById<Button>(
+        findViewById<android.view.View>(
             R.id.selectButton
         ).setOnClickListener {
 
-            imagePicker.launch(
-                "image/*"
-            )
+            requestCapture()
         }
     }
 
-    private fun loadAndRun(
-        uri: Uri
-    ) {
+    private fun requestCapture() {
 
-        lifecycleScope.launch(
-            Dispatchers.IO
-        ) {
+        val intent =
+            projectionManager.createScreenCaptureIntent()
 
-            try {
-
-                val bitmap =
-                    loadBitmap(uri)
-
-                if (bitmap == null) {
-
-                    withContext(
-                        Dispatchers.Main
-                    ) {
-                        status.text =
-                            "Cannot load image"
-                    }
-
-                    return@launch
-                }
-
-                val start =
-                    System.nanoTime()
-
-                val result =
-                    detector.detect(bitmap)
-
-                val elapsed =
-                    (
-                        System.nanoTime() -
-                            start
-                        ) / 1_000_000.0
-
-                withContext(
-                    Dispatchers.Main
-                ) {
-
-                    imageView.setImageBitmap(
-                        bitmap
-                    )
-
-                    overlay.setPose(
-                        result
-                    )
-
-                    status.text =
-                        "18 keypoints | " +
-                            "%.1f ms".format(
-                                elapsed
-                            )
-                }
-
-            } catch (e: Exception) {
-
-                withContext(
-                    Dispatchers.Main
-                ) {
-
-                    status.text =
-                        "Error: ${e.message}"
-                }
-            }
-        }
-    }
-
-    private fun loadBitmap(
-        uri: Uri
-    ): Bitmap? {
-
-        return try {
-
-            if (
-                Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.P
-            ) {
-
-                val source =
-                    ImageDecoder.createSource(
-                        contentResolver,
-                        uri
-                    )
-
-                ImageDecoder.decodeBitmap(
-                    source
-                )
-
-            } else {
-
-                @Suppress("DEPRECATION")
-
-                MediaStore.Images.Media.getBitmap(
-                    contentResolver,
-                    uri
-                )
-            }
-
-        } catch (
-            _: Exception
-        ) {
-
-            null
-        }
+        projectionLauncher.launch(
+            intent
+        )
     }
 
     override fun onDestroy() {
-
-        detector.close()
 
         super.onDestroy()
     }
