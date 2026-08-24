@@ -1,18 +1,57 @@
-<uses-permission
-    android:name="android.permission.BLUETOOTH" />
+<?xml version="1.0" encoding="utf-8"?>
 
-<uses-permission
-    android:name="android.permission.BLUETOOTH_ADMIN" />
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
-<uses-permission
-    android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Bluetooth -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH" />
 
-<uses-permission
-    android:name="android.permission.BLUETOOTH_SCAN"
-    android:usesPermissionFlags="neverForLocation" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN" />
 
-<uses-permission
-    android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
 
-<uses-permission
-    android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Foreground service -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- MediaProjection foreground service -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
+    <application
+        android:allowBackup="true"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+        android:label="Cucak">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+
+            <intent-filter>
+
+                <action
+                    android:name="android.intent.action.MAIN" />
+
+                <category
+                    android:name="android.intent.category.LAUNCHER" />
+
+            </intent-filter>
+
+        </activity>
+
+        <service
+            android:name=".ScreenCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+    </application>
+
+</manifest>
