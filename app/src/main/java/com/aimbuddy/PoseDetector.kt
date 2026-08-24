@@ -1,4 +1,4 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -32,6 +32,9 @@ class PoseDetector(
     fun detect(
         source: Bitmap
     ): PoseResult {
+
+        val start =
+            System.nanoTime()
 
         val bitmap =
             Bitmap.createScaledBitmap(
@@ -96,12 +99,26 @@ class PoseDetector(
         val output =
             outputs[0].readFloat()
 
-        return PoseDecoder.decode(output)
+        val decoded =
+            PoseDecoder.decode(output)
+
+        val elapsed =
+            (
+                System.nanoTime() -
+                    start
+                ) / 1_000_000.0
+
+        return decoded.copy(
+            inferenceMs = elapsed
+        )
     }
 
     fun close() {
-        // LiteRT 2.1.0:
-        // CompiledModel.destroy() is protected,
-        // so it cannot be called directly here.
+        /*
+         * Không gọi model.destroy().
+         *
+         * LiteRT version hiện tại của project
+         * không cho phép gọi destroy() ở đây.
+         */
     }
 }
