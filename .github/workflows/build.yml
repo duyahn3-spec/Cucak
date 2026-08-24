@@ -37,11 +37,14 @@ jobs:
           ./gradlew clean assembleDebug --stacktrace > build.log 2>&1
           EXIT_CODE=$?
 
-          echo "========== LAST 150 LINES =========="
-          tail -150 build.log
+          echo "========== KOTLIN ERRORS =========="
+          grep -n -E "^e: |^w: |error:|\.kt:[0-9]+:[0-9]+" build.log | tail -150
 
-          echo "========== IMPORTANT ERRORS =========="
-          grep -n -E "FAILURE:|What went wrong:|Caused by:|error:|Error:|BUILD FAILED" build.log | tail -100
+          echo "========== GRADLE FAILURE =========="
+          grep -n -E "FAILURE:|What went wrong:|Caused by:|BUILD FAILED" build.log | tail -50
+
+          echo "========== LAST 80 LINES =========="
+          tail -80 build.log
 
           exit $EXIT_CODE
 
