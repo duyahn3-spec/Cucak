@@ -2,52 +2,39 @@ package com.example.poseresearch
 
 object PoseDecoder {
 
-    private const val KEYPOINT_COUNT = 18
+    fun encode(
+        result: PoseResult
+    ): ByteArray {
 
-    fun decode(
-        output: FloatArray
-    ): PoseResult {
+        val builder =
+            StringBuilder()
 
-        require(output.size == 32 * 32 * 19) {
-            "Unexpected output size: ${output.size}"
-        }
-
-        val points = ArrayList<PoseKeypoint>(
-            KEYPOINT_COUNT
+        builder.append(
+            "POSE,"
         )
 
-        for (keypoint in 0 until KEYPOINT_COUNT) {
+        builder.append(
+            result.centerX
+        )
 
-            var bestScore = Float.NEGATIVE_INFINITY
-            var bestX = 0
-            var bestY = 0
+        builder.append(',')
 
-            for (y in 0 until 32) {
+        builder.append(
+            result.centerY
+        )
 
-                for (x in 0 until 32) {
+        builder.append(',')
 
-                    val index =
-                        (y * 32 + x) * 19 + keypoint
+        builder.append(
+            result.latencyMs
+        )
 
-                    val score = output[index]
+        builder.append('\n')
 
-                    if (score > bestScore) {
-                        bestScore = score
-                        bestX = x
-                        bestY = y
-                    }
-                }
-            }
-
-            points.add(
-                PoseKeypoint(
-                    x = bestX / 31f,
-                    y = bestY / 31f,
-                    score = bestScore
-                )
+        return builder
+            .toString()
+            .toByteArray(
+                Charsets.UTF_8
             )
-        }
-
-        return PoseResult(points)
     }
 }
