@@ -33,12 +33,13 @@ class PoseDetector(
         source: Bitmap
     ): PoseResult {
 
-        val bitmap = Bitmap.createScaledBitmap(
-            source,
-            INPUT_SIZE,
-            INPUT_SIZE,
-            true
-        )
+        val bitmap =
+            Bitmap.createScaledBitmap(
+                source,
+                INPUT_SIZE,
+                INPUT_SIZE,
+                true
+            )
 
         val pixels =
             IntArray(
@@ -99,6 +100,8 @@ class PoseDetector(
     }
 
     fun close() {
-        model.destroy()
+        // LiteRT 2.1.0:
+        // CompiledModel.destroy() is protected,
+        // so it cannot be called directly here.
     }
 }
