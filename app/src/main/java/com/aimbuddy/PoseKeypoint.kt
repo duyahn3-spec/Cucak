@@ -1,7 +1,8 @@
 package com.example.poseresearch
 
 data class PoseKeypoint(
+    val name: String,
     val x: Float,
     val y: Float,
-    val score: Float
+    val confidence: Float
 )
