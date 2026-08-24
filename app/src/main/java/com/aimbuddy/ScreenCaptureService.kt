@@ -8,12 +8,11 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.aimbuddy.R
 
 class ScreenCaptureService : Service() {
 
     companion object {
-        private const val CHANNEL_ID = "ScreenCapture_Channel"
+        private const val CHANNEL_ID = "screen_capture_channel"
         private const val NOTIFICATION_ID = 12345
     }
 
@@ -48,16 +47,19 @@ class ScreenCaptureService : Service() {
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Screen Capture Service",
+                "Screen Capture",
                 NotificationManager.IMPORTANCE_LOW
             )
 
-            val notificationManager =
+            channel.description =
+                "Screen capture service"
+
+            val manager =
                 getSystemService(
                     NotificationManager::class.java
                 )
 
-            notificationManager.createNotificationChannel(
+            manager.createNotificationChannel(
                 channel
             )
         }
@@ -69,19 +71,36 @@ class ScreenCaptureService : Service() {
             this,
             CHANNEL_ID
         )
+            .setSmallIcon(
+                android.R.drawable.ic_menu_view
+            )
             .setContentTitle(
                 "Screen Capture"
             )
             .setContentText(
                 "Screen capture service is running"
             )
-            .setSmallIcon(
-                R.mipmap.ic_launcher
-            )
             .setOngoing(true)
-            .setPriority(
-                NotificationCompat.PRIORITY_LOW
+            .setCategory(
+                NotificationCompat.CATEGORY_SERVICE
             )
             .build()
+    }
+
+    override fun onDestroy() {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+            val manager =
+                getSystemService(
+                    NotificationManager::class.java
+                )
+
+            manager.deleteNotificationChannel(
+                CHANNEL_ID
+            )
+        }
+
+        super.onDestroy()
     }
 }
