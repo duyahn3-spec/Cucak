@@ -1,4 +1,4 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 import android.content.Intent
 import android.os.Build
