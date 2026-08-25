@@ -1,40 +1,37 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 object PoseDecoder {
 
-    fun encode(
-        result: PoseResult
-    ): ByteArray {
+    private val KEYPOINT_NAMES = arrayOf(
+        "Nose", "Neck", "RShoulder", "RElbow", "RWrist",
+        "LShoulder", "LElbow", "LWrist", "RHip", "RKnee",
+        "RAnkle", "LHip", "LKnee", "LAnkle", "REye",
+        "LEye", "REar", "LEar"
+    )
 
-        val builder =
-            StringBuilder()
-
-        builder.append(
-            "POSE,"
-        )
-
-        builder.append(
-            result.centerX
-        )
-
-        builder.append(',')
-
-        builder.append(
-            result.centerY
-        )
-
-        builder.append(',')
-
-        builder.append(
-            result.latencyMs
-        )
-
-        builder.append('\n')
-
-        return builder
-            .toString()
-            .toByteArray(
-                Charsets.UTF_8
-            )
+    fun decode(output: FloatArray): PoseResult {
+        val points = mutableListOf<PoseKeypoint>()
+        for (k in 0 until 18) {
+            var bestScore = Float.NEGATIVE_INFINITY
+            var bestX = 0
+            var bestY = 0
+            for (y in 0 until 32) {
+                for (x in 0 until 32) {
+                    val score = output[(y * 32 + x) * 19 + k]
+                    if (score > bestScore) {
+                        bestScore = score
+                        bestX = x
+                        bestY = y
+                    }
+                }
+            }
+            points.add(PoseKeypoint(
+                name = KEYPOINT_NAMES[k],
+                x = bestX / 31f,
+                y = bestY / 31f,
+                confidence = bestScore
+            ))
+        }
+        return PoseResult(points)
     }
 }
