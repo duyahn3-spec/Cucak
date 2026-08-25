@@ -1,8 +1,8 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 data class PoseKeypoint(
     val name: String,
-    val x: Float,
+    val x: Float,   // normalized 0..1
     val y: Float,
     val confidence: Float
 )
