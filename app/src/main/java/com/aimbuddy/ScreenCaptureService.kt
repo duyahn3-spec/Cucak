@@ -1,4 +1,4 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 import android.app.Notification
 import android.app.NotificationChannel
