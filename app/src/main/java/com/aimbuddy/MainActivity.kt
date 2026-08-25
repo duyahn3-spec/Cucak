@@ -1,165 +1,94 @@
 package com.example.poseresearch
 
-import android.Manifest
-import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Button
-import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var btnStart: Button
+    private lateinit var btnStop: Button
+    private lateinit var overlayView: PoseOverlayView
+
     companion object {
-        private const val REQUEST_CAPTURE = 5001
+        private const val REQUEST_CODE_OVERLAY = 1001
+        private const val REQUEST_CODE_MEDIA_PROJECTION = 1002
     }
-
-    private lateinit var statusText: TextView
-    private lateinit var startButton: Button
-    private lateinit var stopButton: Button
-
-    private val permissionLauncher =
-        registerForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions()
-        ) {
-            requestProjection()
-        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContentView(R.layout.activity_main)
 
-        statusText = findViewById(R.id.statusText)
-        startButton = findViewById(R.id.startButton)
-        stopButton = findViewById(R.id.stopButton)
+        btnStart = findViewById(R.id.btnStart)
+        btnStop = findViewById(R.id.btnStop)
+        overlayView = findViewById(R.id.overlayView)
 
-        startButton.setOnClickListener {
-            requestBluetoothPermissions()
+        btnStart.setOnClickListener {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!Settings.canDrawOverlays(this)) {
+                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:$packageName"))
+                    startActivityForResult(intent, REQUEST_CODE_OVERLAY)
+                    return@setOnClickListener
+                }
+            }
+            requestMediaProjection()
         }
 
-        stopButton.setOnClickListener {
+        btnStop.setOnClickListener {
             stopCapture()
         }
 
-        statusText.text = "Sẵn sàng"
+        btnStop.isEnabled = false
     }
 
-    private fun requestBluetoothPermissions() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-
-            val permissions = arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT
-            )
-
-            val missing = permissions.filter {
-                ContextCompat.checkSelfPermission(
-                    this,
-                    it
-                ) != PackageManager.PERMISSION_GRANTED
-            }
-
-            if (missing.isNotEmpty()) {
-                permissionLauncher.launch(
-                    missing.toTypedArray()
-                )
-                return
-            }
-        }
-
-        requestProjection()
+    private fun requestMediaProjection() {
+        val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
+        val intent = projectionManager.createScreenCaptureIntent()
+        startActivityForResult(intent, REQUEST_CODE_MEDIA_PROJECTION)
     }
 
-    private fun requestProjection() {
-
-        val manager =
-            getSystemService(
-                MEDIA_PROJECTION_SERVICE
-            ) as MediaProjectionManager
-
-        val intent =
-            manager.createScreenCaptureIntent()
-
-        startActivityForResult(
-            intent,
-            REQUEST_CAPTURE
-        )
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            REQUEST_CODE_OVERLAY -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
+                    requestMediaProjection()
+                } else {
+                    Toast.makeText(this, "Overlay permission required", Toast.LENGTH_SHORT).show()
+                }
+            }
+            REQUEST_CODE_MEDIA_PROJECTION -> {
+                if (resultCode == RESULT_OK && data != null) {
+                    startCapture(resultCode, data)
+                } else {
+                    Toast.makeText(this, "MediaProjection permission required", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
-    @Deprecated("Deprecated API retained for Android compatibility")
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?
-    ) {
-        super.onActivityResult(
-            requestCode,
-            resultCode,
-            data
-        )
-
-        if (requestCode != REQUEST_CAPTURE) {
-            return
+    private fun startCapture(resultCode: Int, data: Intent) {
+        val serviceIntent = Intent(this, CaptureService::class.java).apply {
+            putExtra("resultCode", resultCode)
+            putExtra("data", data)
         }
-
-        if (resultCode != Activity.RESULT_OK || data == null) {
-
-            statusText.text =
-                "MediaProjection bị từ chối"
-
-            return
-        }
-
-        val serviceIntent =
-            Intent(
-                this,
-                ScreenCaptureService::class.java
-            ).apply {
-
-                action =
-                    ScreenCaptureService.ACTION_START
-
-                putExtra(
-                    ScreenCaptureService.EXTRA_RESULT_CODE,
-                    resultCode
-                )
-
-                putExtra(
-                    ScreenCaptureService.EXTRA_RESULT_DATA,
-                    data
-                )
-            }
-
-        ContextCompat.startForegroundService(
-            this,
-            serviceIntent
-        )
-
-        statusText.text =
-            "Đã cấp quyền — chờ 3 giây..."
+        ContextCompat.startForegroundService(this, serviceIntent)
+        btnStart.isEnabled = false
+        btnStop.isEnabled = true
+        Toast.makeText(this, "Capture started", Toast.LENGTH_SHORT).show()
     }
 
     private fun stopCapture() {
-
-        val intent =
-            Intent(
-                this,
-                ScreenCaptureService::class.java
-            ).apply {
-                action =
-                    ScreenCaptureService.ACTION_STOP
-            }
-
-        startService(intent)
-
-        statusText.text =
-            "Đã dừng"
+        stopService(Intent(this, CaptureService::class.java))
+        overlayView.clearPose()
+        btnStart.isEnabled = true
+        btnStop.isEnabled = false
+        Toast.makeText(this, "Capture stopped", Toast.LENGTH_SHORT).show()
     }
 }
