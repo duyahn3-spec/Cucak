@@ -1,176 +1,69 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
 
-class PoseOverlayView @JvmOverloads constructor(
-    context: Context,
-    attrs: AttributeSet? = null
-) : View(context, attrs) {
+class PoseOverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
-    private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private var keypoints: List<PoseKeypoint> = emptyList()
+    private val paint = Paint().apply {
+        color = Color.GREEN
+        strokeWidth = 6f
         style = Paint.Style.STROKE
-        strokeWidth = 3f
+        textSize = 40f
     }
-
-    private val skeletonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 4f
-    }
-
-    private val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val dotPaint = Paint().apply {
+        color = Color.RED
         style = Paint.Style.FILL
     }
 
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        textSize = 32f
+    private val connections = listOf(
+        0 to 1, 1 to 2, 2 to 3, 3 to 4,
+        1 to 5, 5 to 6, 6 to 7,
+        1 to 8, 8 to 9, 9 to 10,
+        8 to 11, 11 to 12, 12 to 13,
+        0 to 14, 0 to 15,
+        14 to 16, 15 to 17
+    )
+
+    fun updatePose(points: List<PoseKeypoint>) {
+        keypoints = points
+        invalidate()
     }
 
-    private var results: List<PoseResult> = emptyList()
-    private var fps = 0f
-    private var latencyMs = 0f
-
-    fun update(
-        newResults: List<PoseResult>,
-        newFps: Float,
-        newLatencyMs: Float
-    ) {
-        results = newResults
-        fps = newFps
-        latencyMs = newLatencyMs
-        postInvalidateOnAnimation()
+    fun clearPose() {
+        keypoints = emptyList()
+        invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (keypoints.isEmpty()) return
 
-        for (result in results) {
-            drawPerson(canvas, result)
+        val w = width.toFloat()
+        val h = height.toFloat()
+
+        for ((i, j) in connections) {
+            if (i < keypoints.size && j < keypoints.size) {
+                val p1 = keypoints[i]
+                val p2 = keypoints[j]
+                if (p1.confidence > 0.3f && p2.confidence > 0.3f) {
+                    canvas.drawLine(p1.x * w, p1.y * h, p2.x * w, p2.y * h, paint)
+                }
+            }
         }
 
-        textPaint.textSize = 28f
-        canvas.drawText(
-            "FPS: %.1f  Latency: %.1f ms".format(
-                fps,
-                latencyMs
-            ),
-            20f,
-            40f,
-            textPaint
-        )
-    }
-
-    private fun drawPerson(
-        canvas: Canvas,
-        result: PoseResult
-    ) {
-        val box = RectF(
-            result.left,
-            result.top,
-            result.right,
-            result.bottom
-        )
-
-        canvas.drawRect(box, boxPaint)
-
-        val cx = (result.left + result.right) / 2f
-        val cy = (result.top + result.bottom) / 2f
-
-        textPaint.textSize = 30f
-
-        canvas.drawText(
-            "ID ${result.id}",
-            result.left,
-            (result.top - 55f).coerceAtLeast(30f),
-            textPaint
-        )
-
-        canvas.drawText(
-            "X: ${cx.toInt()}  Y: ${cy.toInt()}",
-            result.left,
-            (result.top - 20f).coerceAtLeast(30f),
-            textPaint
-        )
-
-        drawSkeleton(
-            canvas,
-            result.keypoints
-        )
-    }
-
-    private fun drawSkeleton(
-        canvas: Canvas,
-        points: List<PoseKeypoint>
-    ) {
-        val connections = arrayOf(
-            intArrayOf(0, 1),
-            intArrayOf(1, 2),
-            intArrayOf(2, 3),
-            intArrayOf(3, 4),
-
-            intArrayOf(5, 6),
-
-            intArrayOf(5, 7),
-            intArrayOf(7, 9),
-
-            intArrayOf(6, 8),
-            intArrayOf(8, 10),
-
-            intArrayOf(5, 11),
-            intArrayOf(6, 12),
-
-            intArrayOf(11, 12),
-
-            intArrayOf(11, 13),
-            intArrayOf(13, 15),
-
-            intArrayOf(12, 14),
-            intArrayOf(14, 16)
-        )
-
-        for (connection in connections) {
-
-            val a = connection[0]
-            val b = connection[1]
-
-            if (a >= points.size || b >= points.size) {
-                continue
+        for (kp in keypoints) {
+            if (kp.confidence > 0.3f) {
+                val x = kp.x * w
+                val y = kp.y * h
+                canvas.drawCircle(x, y, 12f, dotPaint)
+                canvas.drawText("${kp.name} (${"%.2f".format(kp.confidence)})", x + 20, y - 20, paint)
             }
-
-            val p1 = points[a]
-            val p2 = points[b]
-
-            if (p1.score <= 0f || p2.score <= 0f) {
-                continue
-            }
-
-            canvas.drawLine(
-                p1.x,
-                p1.y,
-                p2.x,
-                p2.y,
-                skeletonPaint
-            )
-        }
-
-        for (point in points) {
-
-            if (point.score <= 0f) {
-                continue
-            }
-
-            canvas.drawCircle(
-                point.x,
-                point.y,
-                6f,
-                pointPaint
-            )
         }
     }
 }
