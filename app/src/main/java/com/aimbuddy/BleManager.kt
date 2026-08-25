@@ -1,4 +1,4 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -16,7 +16,7 @@ class BleManager(private val context: Context) {
 
     companion object {
         private const val TAG = "BleManager"
-        private const val ESP32_MAC = "30:ED:A0:5A:36:A6" // Sửa MAC thực tế
+        private const val ESP32_MAC = "30:ED:A0:5A:36:A6"
         private val SERVICE_UUID = UUID.fromString("0000FFF0-0000-1000-8000-00805F9B34FB")
         private val CHAR_UUID = UUID.fromString("0000FFF1-0000-1000-8000-00805F9B34FB")
     }
