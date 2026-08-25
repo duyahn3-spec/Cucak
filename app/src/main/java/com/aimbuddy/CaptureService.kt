@@ -1,4 +1,4 @@
-package com.example.poseresearch
+package com.aimbuddy
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -54,7 +54,7 @@ class CaptureService : Service() {
         poseDetector = PoseDetector(this)
         bleManager = BleManager(this)
         bleManager.connect()
-        overlayView = PoseOverlayView(this, null) // sẽ được tham chiếu từ MainActivity
+        overlayView = PoseOverlayView(this, null)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -100,13 +100,12 @@ class CaptureService : Service() {
 
     private fun processImage(image: Image) {
         val bitmap = imageToBitmap(image) ?: return
-        val keypoints = poseDetector.detect(bitmap)
+        val result = poseDetector.detect(bitmap)
         bitmap.recycle()
 
-        // Lấy Nose (index 0)
-        val nose = keypoints.firstOrNull { it.name == "Nose" }
+        val nose = result.keypoints.firstOrNull { it.name == "Nose" }
         if (nose != null && nose.confidence > 0.4f) {
-            val screenWidth = 1080  // thay bằng độ phân giải màn hình thực tế
+            val screenWidth = 1080
             val screenHeight = 2400
             val x = nose.x * screenWidth
             val y = nose.y * screenHeight
@@ -115,13 +114,11 @@ class CaptureService : Service() {
             bleManager.sendDelta(dx, dy)
         }
 
-        // Cập nhật overlay
         val intent = Intent("POSE_UPDATE").apply {
-            putExtra("keypoints", keypoints.toTypedArray())
+            putExtra("keypoints", result.keypoints.toTypedArray())
         }
         sendBroadcast(intent)
 
-        // Tính FPS
         frameCount++
         val elapsed = System.currentTimeMillis() - startTime
         if (elapsed >= 1000) {
