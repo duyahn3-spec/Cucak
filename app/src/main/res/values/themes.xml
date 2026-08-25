@@ -1,15 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
-
 <resources>
-
-    <style
-        name="Theme.PoseResearch"
-        parent="Theme.Material3.DayNight.NoActionBar">
-
-        <item name="android:windowActionModeOverlay">
-            true
-        </item>
-
+    <style name="Theme.PoseResearch" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">#1a1a2e</item>
+        <item name="colorPrimaryDark">#16213e</item>
+        <item name="colorAccent">#4CAF50</item>
+        <item name="android:windowBackground">#1a1a2e</item>
+        <item name="android:statusBarColor">#16213e</item>
+        <item name="android:navigationBarColor">#16213e</item>
     </style>
-
 </resources>
